@@ -3,59 +3,48 @@
   * File Name          : main.c
   * Description        : Main program body
   ******************************************************************************
-  * This notice applies to any and all portions of this file
+  ** This notice applies to any and all portions of this file
   * that are not between comment pairs USER CODE BEGIN and
   * USER CODE END. Other portions of this file, whether 
   * inserted by the user or by software development tools
   * are owned by their respective copyright owners.
   *
-  * Copyright (c) 2017 STMicroelectronics International N.V. 
-  * All rights reserved.
+  * COPYRIGHT(c) 2017 STMicroelectronics
   *
-  * Redistribution and use in source and binary forms, with or without 
-  * modification, are permitted, provided that the following conditions are met:
+  * Redistribution and use in source and binary forms, with or without modification,
+  * are permitted provided that the following conditions are met:
+  *   1. Redistributions of source code must retain the above copyright notice,
+  *      this list of conditions and the following disclaimer.
+  *   2. Redistributions in binary form must reproduce the above copyright notice,
+  *      this list of conditions and the following disclaimer in the documentation
+  *      and/or other materials provided with the distribution.
+  *   3. Neither the name of STMicroelectronics nor the names of its contributors
+  *      may be used to endorse or promote products derived from this software
+  *      without specific prior written permission.
   *
-  * 1. Redistribution of source code must retain the above copyright notice, 
-  *    this list of conditions and the following disclaimer.
-  * 2. Redistributions in binary form must reproduce the above copyright notice,
-  *    this list of conditions and the following disclaimer in the documentation
-  *    and/or other materials provided with the distribution.
-  * 3. Neither the name of STMicroelectronics nor the names of other 
-  *    contributors to this software may be used to endorse or promote products 
-  *    derived from this software without specific written permission.
-  * 4. This software, including modifications and/or derivative works of this 
-  *    software, must execute solely and exclusively on microcontroller or
-  *    microprocessor devices manufactured by or for STMicroelectronics.
-  * 5. Redistribution and use of this software other than as permitted under 
-  *    this license is void and will automatically terminate your rights under 
-  *    this license. 
-  *
-  * THIS SOFTWARE IS PROVIDED BY STMICROELECTRONICS AND CONTRIBUTORS "AS IS" 
-  * AND ANY EXPRESS, IMPLIED OR STATUTORY WARRANTIES, INCLUDING, BUT NOT 
-  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
-  * PARTICULAR PURPOSE AND NON-INFRINGEMENT OF THIRD PARTY INTELLECTUAL PROPERTY
-  * RIGHTS ARE DISCLAIMED TO THE FULLEST EXTENT PERMITTED BY LAW. IN NO EVENT 
-  * SHALL STMICROELECTRONICS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-  * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-  * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
-  * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
-  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
-  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   *
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f4xx_hal.h"
-#include "fatfs.h"
 
 /* USER CODE BEGIN Includes */
-
+#include "stm32f4xx_hal_spi.h";
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
-SD_HandleTypeDef hsd;
+SPI_HandleTypeDef hspi1;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
@@ -65,7 +54,7 @@ SD_HandleTypeDef hsd;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_SDIO_SD_Init(void);
+static void MX_SPI1_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -101,16 +90,26 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_SDIO_SD_Init();
-  MX_FATFS_Init();
+  MX_SPI1_Init();
 
   /* USER CODE BEGIN 2 */
-  //Local Declarations for Loop
-  FIL SensorData;
-  uint8_t RawData[4] = "Temp";	//Replace with array of sensor data
-  UINT ByteCount = 4;
-  FATFS SDCard;
-  int PacketReady = 1;
+  uint8_t counter = 0;
+  uint8_t data[8] = "Greeting";
+  uint8_t null = 0x00;
+  uint8_t high[1] = {0xFF};
+  uint8_t receivebuffer[1] = {0};
+  uint8_t high_array[9] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+  uint8_t CMD0_array[5] = {0x40,0x00,0x00,0x00,0x00,0x95};
+  uint8_t CMD8_array[1] = {0x01,0xAA};
+  uint8_t CMD55_array[2] = {0x00,0x65};
+  //uint16_t CMD8_array[]
+  uint8_t SDinit_receivebuffer[5] = {0,0,0,0,0,0};
+  uint8_t loop1 = 1;
+  uint8_t SDinit = 1;
+  uint8_t SDinit_confirm_command;
+  uint8_t SDinit_confirm_CRC;
+  uint8_t SDinit_counter = 100;
+  uint8_t SDinit_receive = 0;
 
   /* USER CODE END 2 */
 
@@ -122,29 +121,132 @@ int main(void)
 
   /* USER CODE BEGIN 3 */
 
-	  // go to first sensor, take data and write to file
-	  // repeat for all sensors on bus x times per time frame
-
-
-	  HAL_GPIO_TogglePin(GPIOD,GPIO_PIN_13);
-	  HAL_Delay(500);
-	  //Insert switch for each sensor, separate files
-
-
-	/**  if((f_mount(&SDCard, SDPath, 1) == FR_OK) && (PacketReady == 1))
+	  while(SDinit == 1)
 	  {
-		  f_open(&SensorData, "SensorData\0", FA_WRITE|FA_CREATE_ALWAYS);
-		  f_write(&SensorData, RawData, 11, &ByteCount);
-		  f_close(&SensorData);
-		  HAL_GPIO_WritePin(GPIOD,GPIO_PIN_12,1);
-		  PacketReady = 0;
-	  }**/
+		  while(SDinit_counter > 0)
+		  {
+			  HAL_GPIO_WritePin(GPIOD,GPIO_PIN_11,1);
+			  HAL_SPI_Transmit(&hspi1,&high_array[0],8,5000);
+			  HAL_Delay(20);
+			  SDinit_counter--;
+		  }
+		  HAL_GPIO_WritePin(GPIOD,GPIO_PIN_11,0);
+		  HAL_Delay(100);
+
+		  while(SDinit_receive == 0)
+		  {
+			  uint8_t CMD0_check = 0;
+			  uint8_t CMD0_cont = 0;
+			  while(CMD0_check == 0 && CMD0_cont < 20)
+			  {
+				  HAL_SPI_Transmit(&hspi1[0],&CMD0_array[0],8,5000);	//CMD0
+				  HAL_SPI_Transmit(&hspi1[1],&CMD0_array[1],8,5000);
+				  HAL_SPI_Transmit(&hspi1[2],&CMD0_array[2],8,5000);
+				  HAL_SPI_Transmit(&hspi1[3],&CMD0_array[3],8,5000);
+				  HAL_SPI_Transmit(&hspi1[4],&CMD0_array[4],8,5000);
+				  HAL_SPI_Transmit(&hspi1[5],&CMD0_array[5],8,5000);
+				  while(HAL_SPI_GetState(&hspi1) == HAL_SPI_STATE_BUSY);
+				  counter = 0;
+				  while(receivebuffer[0] != 0x01 && counter < 500)
+				  {
+					  HAL_SPI_TransmitReceive(&hspi1,&high[0],&receivebuffer[0],8,5000);
+					  while(HAL_SPI_GetState(&hspi1) == HAL_SPI_STATE_BUSY);
+					  counter++;
+				  }
+				  if(counter != 500)
+				  {
+					  CMD0_check = 1;
+				  }
+				  CMD0_cont++;
+			  }
 
 
-	  //Q up Can packets
-	  //
-	  //
+			  uint8_t CMD8_check = 0;
+			  while(CMD8_check == 0)
+			  {
+			  HAL_SPI_Transmit(&hspi1[0],&CMD8_array[0],8,5000);	//CMD8
+			  HAL_SPI_Transmit(&hspi1[1],&CMD8_array[1],8,5000);
+			  while(HAL_SPI_GetState(&hspi1) == HAL_SPI_STATE_BUSY);
+			  counter = 0;
+			  while(receivebuffer[0] != 0x01 && receivebuffer[1] != 0x01 && receivebuffer[2] != 0xAA && counter < 500)
+			  {
+				  HAL_SPI_TransmitReceive(&hspi1,&high[0],&receivebuffer[0],8,5000);
+				  while(HAL_SPI_GetState(&hspi1) == HAL_SPI_STATE_BUSY);
+				  counter++;
+			  }
+			  if(counter != 500)
+			  {
+				  CMD8_check = 1;
+			  }
 
+
+			  uint8_t CMD55_check = 0;
+			  while(CMD8_check == 0)
+			  {
+				  HAL_SPI_Transmit(&hspi1[0],&CMD55_array[0],8,5000);
+				  HAL_SPI_Transmit(&hspi1[0],&CMD55_array[1],8,5000);
+				  while(HAL_SPI_GetState(&hspi1) == HAL_SPI_STATE_BUSY);
+				  counter = 0;
+				  while(receivebuffer[0] != 0x01 && )
+			  }
+
+			  HAL_SPI_Transmit(&hspi1,0x0,1,5000);	//CMD55
+			  while(HAL_SPI_GetState(&hspi1) == HAL_SPI_STATE_BUSY);
+
+
+			  HAL_SPI_Transmit(&hspi1,0x40000000,1,5000);	//ACMD41
+			  while(HAL_SPI_GetState(&hspi1) == HAL_SPI_STATE_BUSY);
+			  if(SPI)
+
+		  }
+
+		  /*while(SDinit_receive == 0)	//set CS and
+		  {
+			  HAL_SPI_Receive(&hspi1,&SDinit_receivebuffer[0],1,5000);
+			  while(HAL_SPI_GetState(&hspi1) == HAL_SPI_STATE_BUSY);
+			  if(SDinit_receivebuffer[0] == HAL_SPI_STATE_READY)
+			  {
+				  HAL_Delay(500);
+				  HAL_GPIO_WritePin(GPIOD,GPIO_PIN_12,1);
+				  SDinit_receive = 1;
+			  }
+		  }*/
+
+
+
+
+		  //if(SDinit_confirm_command == 0x3F && SDinit_confirm_CRC == 0xFF)
+		  {
+			  //HAL_GPIO_TogglePin(GPIOD,GPIO_PIN_12,1);
+			 // HAL_Delay(200);
+			 // SDinit = 0;
+		  }
+		  SDinit = 0;
+	  }
+	  SDinit = 1;
+	  HAL_SPI_Transmit(&hspi1,&null,1,5000);
+	  while(HAL_SPI_GetState(&hspi1) == HAL_SPI_STATE_BUSY);
+
+	  while(loop1 == 1)
+	  	 {
+	  		  HAL_GPIO_TogglePin(GPIOD,GPIO_PIN_14);
+	  		  //HAL_GPIO_WritePin(GPIOD,GPIO_PIN_11,0);		//cs pin
+	  		  HAL_Delay(100);
+
+	  		  HAL_SPI_Transmit(&hspi1,&null,1,5000);
+	  		  while(HAL_SPI_GetState(&hspi1) == HAL_SPI_STATE_BUSY);
+	  		  HAL_SPI_Transmit(&hspi1,&data,8,5000);
+	  		  while(HAL_SPI_GetState(&hspi1) == HAL_SPI_STATE_BUSY);
+
+	  		  //HAL_GPIO_WritePin(GPIOD,GPIO_PIN_11,1);
+	  		  HAL_Delay(100);
+	  		  loop1 = 0;
+	  		  HAL_GPIO_TogglePin(GPIOD,GPIO_PIN_14);
+	  	 }
+
+	  loop1 = 1;
+	  HAL_GPIO_TogglePin(GPIOD,GPIO_PIN_13);
+	 	  	  HAL_Delay(500);
   }
   /* USER CODE END 3 */
 
@@ -160,7 +262,7 @@ void SystemClock_Config(void)
 
     /**Configure the main internal regulator output voltage 
     */
-  __HAL_RCC_PWR_CLK_ENABLE();
+  __HAL_RCC_PWR_CLK_();
 
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
@@ -206,17 +308,27 @@ void SystemClock_Config(void)
   HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
 }
 
-/* SDIO init function */
-static void MX_SDIO_SD_Init(void)
+/* SPI1 init function */
+static void MX_SPI1_Init(void)
 {
 
-  hsd.Instance = SDIO;
-  hsd.Init.ClockEdge = SDIO_CLOCK_EDGE_RISING;
-  hsd.Init.ClockBypass = SDIO_CLOCK_BYPASS_DISABLE;
-  hsd.Init.ClockPowerSave = SDIO_CLOCK_POWER_SAVE_DISABLE;
-  hsd.Init.BusWide = SDIO_BUS_WIDE_1B;
-  hsd.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
-  hsd.Init.ClockDiv = 0;
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
 
 }
 
@@ -228,9 +340,6 @@ static void MX_SDIO_SD_Init(void)
         * EXTI
      PC3   ------> I2S2_SD
      PA4   ------> I2S3_WS
-     PA5   ------> SPI1_SCK
-     PA6   ------> SPI1_MISO
-     PA7   ------> SPI1_MOSI
      PB10   ------> I2S2_CK
      PC7   ------> I2S3_MCK
      PA9   ------> USB_OTG_FS_VBUS
@@ -238,7 +347,7 @@ static void MX_SDIO_SD_Init(void)
      PA11   ------> USB_OTG_FS_DM
      PA12   ------> USB_OTG_FS_DP
      PC10   ------> I2S3_CK
-     PB5   ------> I2S3_SD
+     PC12   ------> I2S3_SD
      PB6   ------> I2C1_SCL
      PB9   ------> I2C1_SDA
 */
@@ -247,13 +356,13 @@ static void MX_GPIO_Init(void)
 
   GPIO_InitTypeDef GPIO_InitStruct;
 
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOE_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
+  /* GPIO Ports Clock  */
+  __HAL_RCC_GPIOE_CLK_();
+  __HAL_RCC_GPIOC_CLK_();
+  __HAL_RCC_GPIOH_CLK_();
+  __HAL_RCC_GPIOA_CLK_();
+  __HAL_RCC_GPIOB_CLK_();
+  __HAL_RCC_GPIOD_CLK_();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(CS_I2C_SPI_GPIO_Port, CS_I2C_SPI_Pin, GPIO_PIN_RESET);
@@ -262,8 +371,11 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(OTG_FS_PowerSwitchOn_GPIO_Port, OTG_FS_PowerSwitchOn_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin 
-                          |Audio_RST_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_11|LD4_Pin|LD3_Pin|LD5_Pin 
+                          |LD6_Pin|Audio_RST_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : CS_I2C_SPI_Pin */
   GPIO_InitStruct.Pin = CS_I2C_SPI_Pin;
@@ -301,14 +413,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF6_SPI3;
   HAL_GPIO_Init(I2S3_WS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SPI1_SCK_Pin SPI1_MISO_Pin SPI1_MOSI_Pin */
-  GPIO_InitStruct.Pin = SPI1_SCK_Pin|SPI1_MISO_Pin|SPI1_MOSI_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
   /*Configure GPIO pin : BOOT1_Pin */
   GPIO_InitStruct.Pin = BOOT1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
@@ -323,23 +427,24 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
   HAL_GPIO_Init(CLK_IN_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PD11 OTG_FS_OverCurrent_Pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_11|OTG_FS_OverCurrent_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  /*Configure GPIO pin : PB12 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD4_Pin LD3_Pin LD5_Pin LD6_Pin 
-                           Audio_RST_Pin */
-  GPIO_InitStruct.Pin = LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin 
-                          |Audio_RST_Pin;
+  /*Configure GPIO pins : PD11 LD4_Pin LD3_Pin LD5_Pin 
+                           LD6_Pin Audio_RST_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_11|LD4_Pin|LD3_Pin|LD5_Pin 
+                          |LD6_Pin|Audio_RST_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : I2S3_MCK_Pin I2S3_SCK_Pin */
-  GPIO_InitStruct.Pin = I2S3_MCK_Pin|I2S3_SCK_Pin;
+  /*Configure GPIO pins : I2S3_MCK_Pin I2S3_SCK_Pin I2S3_SD_Pin */
+  GPIO_InitStruct.Pin = I2S3_MCK_Pin|I2S3_SCK_Pin|I2S3_SD_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -360,13 +465,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF10_OTG_FS;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PB5 */
-  GPIO_InitStruct.Pin = GPIO_PIN_5;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  /*Configure GPIO pin : OTG_FS_OverCurrent_Pin */
+  GPIO_InitStruct.Pin = OTG_FS_OverCurrent_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternate = GPIO_AF6_SPI3;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(OTG_FS_OverCurrent_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : Audio_SCL_Pin Audio_SDA_Pin */
   GPIO_InitStruct.Pin = Audio_SCL_Pin|Audio_SDA_Pin;
